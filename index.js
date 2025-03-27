@@ -8,22 +8,27 @@ const COC_API_KEY = process.env.COC_API_KEY;
 
 app.get('/api/clan', async (req, res) => {
     try {
-        let clanTag = req.query.tag; // Ambil dari query parameter
+        let clanTag = decodeURIComponent(req.query.tag || '').trim(); // ✅ Ambil dari query parameter -> Decode & hapus spasi
 
         if (!clanTag) {
             return res.status(400).json({ error: "Clan tag is required" });
         }
 
-        // ✅ Bersihkan input: Hapus semua karakter yang bukan alfanumerik atau '#'
-        clanTag = clanTag.replace(/[^a-zA-Z0-9#]/g, '').toUpperCase();
+        // ✅ Cek apakah user memasukkan "#" di awal (beri peringatan)
+        if (clanTag.startsWith('#')) {
+            return res.status(400).json({ error: "Please enter the clan tag without '#'." });
+        }
 
-        // ✅ Pastikan hanya ada satu '#' di depan
-        clanTag = `#${clanTag.replace(/^#+/, '')}`;
+        // ✅ Bersihkan input: Hapus semua karakter yang bukan alfanumerik
+        clanTag = clanTag.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
         // ✅ Validasi panjang clan tag (biasanya 8-10 karakter)
-        if (!/^#[0289CGJLPQRUVY]{8,10}$/.test(clanTag)) {
+        if (!/^[0289CGJLPQRUVY]{8,10}$/.test(clanTag)) {
             return res.status(400).json({ error: "Invalid clan tag format" });
         }
+
+        // ✅ Tambahkan "#" otomatis
+        clanTag = `#${clanTag}`;
 
         const url = `https://api.clashofclans.com/v1/clans/${encodeURIComponent(clanTag)}`;
 
