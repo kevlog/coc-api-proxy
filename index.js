@@ -1,36 +1,50 @@
-import 'dotenv/config';
 import express from 'express';
 import fetch from 'node-fetch';
+import 'dotenv/config';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const COC_API_KEY = process.env.COC_API_KEY;
 
-if (!COC_API_KEY) {
-    console.error("API Key is missing! Please set COC_API_KEY in .env file.");
-    process.exit(1);
-}
-
-app.use(express.json());
-
-// Proxy endpoint untuk mengambil data clan
-app.get('/api/clan/:tag', async (req, res) => {
-    const clanTag = encodeURIComponent(req.params.tag.replace('#', '%23'));
-    const url = `https://api.clashofclans.com/v1/clans/${clanTag}`;
-    
+app.get('/api/clan', async (req, res) => {
     try {
+        let clanTag = req.query.tag; // Ambil dari query parameter
+
+        if (!clanTag) {
+            return res.status(400).json({ error: "Clan tag is required" });
+        }
+
+        // ✅ Bersihkan input: Hapus semua karakter yang bukan alfanumerik atau '#'
+        clanTag = clanTag.replace(/[^a-zA-Z0-9#]/g, '').toUpperCase();
+
+        // ✅ Pastikan hanya ada satu '#' di depan
+        clanTag = `#${clanTag.replace(/^#+/, '')}`;
+
+        // ✅ Validasi panjang clan tag (biasanya 8-10 karakter)
+        if (!/^#[0289CGJLPQRUVY]{8,10}$/.test(clanTag)) {
+            return res.status(400).json({ error: "Invalid clan tag format" });
+        }
+
+        const url = `https://api.clashofclans.com/v1/clans/${encodeURIComponent(clanTag)}`;
+
         const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${COC_API_KEY}` }
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${COC_API_KEY}`,
+                "Content-Type": "application/json"
+            }
         });
-        
+
         if (!response.ok) {
-            return res.status(response.status).json({ error: "Failed to fetch data" });
+            const errorText = await response.text();
+            return res.status(response.status).json({ error: JSON.parse(errorText) });
         }
 
         const data = await response.json();
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: "Internal Server Error" });
+        console.error("Fetch Error:", error);
+        res.status(500).json({ error: "Failed to fetch data" });
     }
 });
 
